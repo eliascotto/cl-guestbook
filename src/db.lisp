@@ -3,7 +3,15 @@
   (:use :cl)
   (:import-from :guestbook.config
                 :*config*
-                :*application-root*))
+                :*application-root*)
+  (:export :db
+           :*connection*
+           :with-connection
+           :init-db
+           :format-timestamp
+           :add-message
+           :delete-message
+           :get-all-messages))
 (in-package :guestbook.db)
 
 (syntax:use-syntax :annot)
@@ -75,3 +83,46 @@ Usage: (with-connection (db :maindb)
 
       (uiop:delete-file-if-exists db-path)
       (create-db db-path schema-path))))
+
+
+;;
+;; Utilities
+
+(defun format-timestamp (universal-time)
+  "Converts a universal time value into a human-readable timestamp string,
+formatted as 'YYYY-MM-DD HH:MM:SS'."
+  (multiple-value-bind (sec min hour day month year)
+      (decode-universal-time universal-time)
+    (format nil "~4,'0D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D" year month day hour min sec)))
+
+
+;;
+;; Message operations
+
+(defun add-message (name message)
+  "Inserts a new message into the database with the given NAME and MESSAGE content."
+  (with-connection (db)
+    (let ((sql "INSERT INTO message (username, ts, content) VALUES (?, ?, ?)")
+          (ts (get-universal-time)))
+      (dbi:do-sql *connection* sql (list name ts message)))))
+
+
+(defun delete-message (id)
+  "Deletes the message with the given ID from the database."
+  (with-connection (db)
+    (let ((sql "DELETE FROM message WHERE id = ?"))
+      (dbi:do-sql *connection* sql (list id)))))
+
+
+(defun get-all-messages ()
+  "Retrieves all messages from the database, ordered by timestamp descending.
+Timestamps are formatted as human-readable strings."
+  (with-connection (db)
+    (let* ((sql "SELECT * FROM message ORDER BY ts DESC")
+           (messages (dbi:fetch-all
+                      (dbi:execute
+                       (dbi:prepare *connection* sql)))))
+      (mapcar (lambda (row)
+                (setf (getf row :|ts|) (format-timestamp (getf row :|ts|)))
+                row)
+              messages))))

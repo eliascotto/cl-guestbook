@@ -27,7 +27,7 @@
                 (debug nil)
               &allow-other-keys)
   "Starts the server."
-  (unless (null *server*)
+  (when *server*
     (restart-case (error "Server is already running.")
       (restart-server ()
         :report "Restart the server."
@@ -43,7 +43,7 @@
 @export
 (defun stop ()
   "Stops the server."
-  (unless (null *server*)
+  (when *server*
     (clack:stop *server*)
     (format t "Server stopped")
     (setf *server* nil)))

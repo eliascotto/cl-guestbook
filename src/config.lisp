@@ -14,5 +14,5 @@
 
 @export
 (defvar *config*
-  '(:databases ((:maindb :sqlite3 :database-name "/Users/elia/dev/Lisp/guestbook/guestbook.sqlite"))
+  `(:databases ((:maindb :sqlite3 :database-name ,(namestring (merge-pathnames "guestbook.sqlite" *application-root*))))
     :schema-file "db/schema.sql"))

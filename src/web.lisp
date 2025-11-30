@@ -1,10 +1,13 @@
 (in-package :cl-user)
 (defpackage guestbook.web
   (:use :cl
-        :caveman2
-        :guestbook.db)
+        :caveman2)
   (:import-from :guestbook.config
                 :*template-directory*)
+  (:import-from :guestbook.db
+                :add-message
+                :delete-message
+                :get-all-messages)
   (:export :*web*))
 (in-package :guestbook.web)
 
@@ -20,57 +23,13 @@
 
 (djula:add-template-directory *template-directory*)
 
-(defparameter *template-registry* (make-hash-table :test 'equal))
-
 (defun render (template-path &optional env)
-  "Renders a Djula template from TEMPLATE-PATH, caching it for reuse.
+  "Renders a Djula template from TEMPLATE-PATH.
 ENV is an optional plist of variables passed to the template."
-  (let ((template (gethash template-path *template-registry*)))
-    (unless template
-      ;; If the template is not already compiled, it is compiled, and stored in *TEMPLATE-REGISTRY*.
-      (setf template (djula:compile-template* (princ-to-string template-path)))
-      (setf (gethash template-path *template-registry*) template))
-    (apply #'djula:render-template*
-           template nil
-           env)))
-
-;;
-;; Utils
-
-(defun decode-ts (ts)
-  "Converts a universal time value TS into a human-readable timestamp string,
-formatted as 'YYYY-MM-DD HH:MM:SS'."
-  (multiple-value-bind (sec min hour day month year)
-    (decode-universal-time ts)
-   (format nil "~4,'0D-~2,'0D-~2,'0D ~2,'0D:~2,'0D:~2,'0D" year month day hour min sec)))
-
-;;
-;; Database access
-
-(defun add-message (name message)
-  (with-connection (db)
-    (let ((sql "INSERT INTO message (username, ts, content) VALUES (?, ?, ?)")
-          (ts (get-universal-time)))
-     (dbi:do-sql *connection* sql (list name ts message)))))
-
-
-(defun delete-message (id)
-  (with-connection (db)
-    (let ((sql "DELETE FROM message WHERE id = ?"))
-      (dbi:do-sql *connection* sql (list id)))))
-
-
-(defun get-all-messages ()
-  (with-connection (db)
-    (let* ((sql "SELECT * FROM message ORDER BY ts DESC")
-           (messages (dbi:fetch-all
-                      (dbi:execute
-                       (dbi:prepare *connection* sql)))))
-      ;; Transform unix timestamp into readable format
-      (mapcar (lambda (row)
-                (setf (getf row :|ts|) (decode-ts (getf row :|ts|)))
-                row)
-              messages))))
+  (apply #'djula:render-template*
+         (djula:compile-template* (princ-to-string template-path))
+         nil
+         env))
 
 ;;
 ;; Routes
